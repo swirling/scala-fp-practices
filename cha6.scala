@@ -1,7 +1,6 @@
 trait RNG {
   def nextInt: (Int, RNG)
 }
-
 object RNG {
   def simple(seed: Long): RNG = new RNG {
     def nextInt = {
@@ -12,8 +11,8 @@ object RNG {
     }
   }
 }
-//type State[S,+A] = S => (A,S)
-case class State[S,+A](run: S => (A,S))
+
+type State[S,+A] = S => (A,S)
 type Rand[A] = State[RNG, A]
 //1
 def positiveInt(rng: RNG): (Int, RNG)  = {
@@ -44,18 +43,18 @@ def ints(count: Int)(rng: RNG): (List[Int], RNG) = {
 }
 // 5
 //type Rand[+A] = RNG => (A, RNG)
-val int: Rand[Int] = new Rand[Int](_.nextInt)
-def unit[A](a: A): Rand[A] =
-    new Rand[A](rng => (a, rng))
+val int: Rand[Int] = _.nextInt
+def unit[S,A](a: A): S => (A,S) =
+    rng => (a, rng)
 
-def map[A, B](s: Rand[A])(f: A=>B): Rand[B]=
-    new Rand[B](rng => {
-        val (a, rng2) =s.run(rng)
+def map[S,A,B](s: S => (A,S))(f: A => B): S => (B,S)=
+    rng => {
+        val (a, rng2) =s(rng)
         (f(a), rng2)
-    })
+    }
 
 def positiveMax(n: Int): Rand[Int]=
-    map(new Rand[Double](rng =>{ double(rng) }))(x => (x*n).floor.toInt)
+    map((rng: RNG) =>{ double(rng) })(x => (x*n).floor.toInt)
 
 
 
@@ -63,13 +62,11 @@ val rng = RNG.simple(2898090)
 val rsInt = positiveInt(rng)
 val rsDouble = double(rng)
 
-println(rsInt)
-println(rsDouble)
-println(new Rand[List[Int]](ints(5)).run(rng))
+println(rsInt, rsDouble, ints(5)(rng))
 
-val pMax = positiveMax(30).run(rng)
-val pMax2 = positiveMax(30).run(pMax._2)
-val pMaxw = map(positiveMax(30))(z => z+30).run(rng)
+val pMax = positiveMax(30)(rng)
+val pMax2 = positiveMax(30)(pMax._2)
+val pMaxw = map(positiveMax(30))(z => z+30)(rng)
 
 println(pMax, pMax2)
 println(pMaxw)
@@ -77,41 +74,35 @@ println(pMaxw)
 // 6
 // def map[A, B](s: Rand[A])(f: A=>B): Rand[B]=
 def double2(rng: RNG): (Double, RNG) =
-    map(new Rand[Int](positiveInt))(a=>a.toDouble/Int.MaxValue.toDouble).run(rng)
+    map(positiveInt)(a=>a.toDouble/Int.MaxValue.toDouble)(rng)
 
 println(double2(rng))
 
 // 7
-def map2[A,B,C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] =
-    new Rand[C](
-        rng =>{
-            val (a, rng1) = ra.run(rng)
-            val (b, rng2) = rb.run(rng1)
-            (f(a,b), rng2)
-        }
-    )
+def map2[S,A,B,C](ra: S=>(A,S), rb: S=>(B,S))(f: (A, B) => C): S=>(C,S) =
+    rng =>{
+        val (a, rng1) = ra(rng)
+        val (b, rng2) = rb(rng1)
+        (f(a,b), rng2)
+    }
 
 // 8
-//type State[S,+A] = S => (A,S)
-//case class State[S,+A](run: S => (A,S))
-//type Rand[A] = State[RNG, A]
 def sequence[A](fs: List[Rand[A]]): Rand[List[A]]=
-    new Rand[List[A]](
-        rng=>{
-            fs match {
-                case Nil => (Nil, rng)
-                case _ => {
-                    val (a, newRng) = fs.head.run(rng)
-                    (List(a) ++ sequence(fs.tail).run(newRng)._1, newRng)
-                }
+    rng =>{
+        fs match {
+            case Nil => (Nil, rng)
+            case _ => {
+                val (a, newRng) = fs.head(rng)
+                (List(a) ++ sequence(fs.tail)(newRng)._1, newRng)
             }
         }
-    )
+    }
 // 9
-def flatMap[A,B](f: Rand[A])(g: A => Rand[B]): Rand[B] ={
-        val (a, rng2) = f.run(rng)
-        g(a)
-}
+def flatMap[S,A,B](f: S=>(A,S))(g: A => (S=>(B,S))): S=>(B,S) =
+    rng => {
+        val (a, rng2) = f(rng)
+        g(a)(rng2)
+    }
 
 // 10
 def mapCopy[A, B](s: Rand[A])(f: A=>B): Rand[B]=
@@ -125,7 +116,12 @@ def map2Copy[A,B,C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] =
             unit(f(a,b))
         })
     })
-val pMaxw2 = mapCopy(positiveMax(30))(z => z+30).run(rng)
+val pMaxw2 = mapCopy(positiveMax(30))(z => z+30)(rng)
 println(pMaxw2)
 
 //11
+// types changed
+
+/// 12
+def get[S]: State[S, S] = (s:S) => (s, s)
+def set[S](newS: S): State[S, Unit] = (s)=>((),newS)
