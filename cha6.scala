@@ -13,6 +13,7 @@ object RNG {
 }
 
 type State[S,+A] = S => (A,S)
+//case class State[S, +A](run: S=>(A,S))
 type Rand[A] = State[RNG, A]
 //1
 def positiveInt(rng: RNG): (Int, RNG)  = {

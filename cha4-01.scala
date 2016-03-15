@@ -34,7 +34,7 @@ def notZero( dnum: Double): Option[Double] =
     if(dnum == 0.0) None else Some(dnum)
 println(Some(0.0).flatMap(notZero))
 println(Some(2.0).flatMap(notZero))
-
+println("flag ",for{data<-notZero(0.0)} yield data)
 println(Some(22.2).getOrElse(0.0))
 println(None.getOrElse(0.1))
 println(None.orElse(Some(0.0)))
