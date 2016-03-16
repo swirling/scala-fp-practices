@@ -45,7 +45,8 @@ def add1(num: Int): State[Machine, Int] = {
 def action(formState: State[Machine,Int], input: Input): State[Machine, Int] = input match {
     //def acc: State[Machine,Int] = sys.error("f")
     case Coin => (for{
-        state2 <-formState.modify(state =>{
+        count <- formState
+        state2 <-State.unit(count).modify((state: Machine) =>{
             Machine(locked= state.locked, candies= state.candies, coins= state.coins+1)
         })
         state3 <- State.unit(state2).map(_+1)
@@ -53,7 +54,7 @@ def action(formState: State[Machine,Int], input: Input): State[Machine, Int] = i
 }
 println(start)
 val temp2 = action(action(start, Coin), Coin)
-temp2.run(Machine(locked=true,candies=2,coins=5))
+println(temp2.run(Machine(locked=true,candies=2,coins=5)))
 def simulateMachine(inputs: List[Input]): State[Machine, Int] =
     inputs match {
         case Nil => State((machine: Machine) =>(0,machine))
@@ -67,7 +68,7 @@ def simulateMachine(inputs: List[Input]): State[Machine, Int] =
             }yield b;
             case Turn => for{
                 count <-simulateMachine(tail)
-                a <-State.unit(count).modify((state: Machine) => {println(state); Machine(locked= !state.locked, candies= state.candies-1, coins= state.coins)})
+                a <-State.unit(count).modify((state: Machine) => {if (!state.locked && state.candies > 0) Machine(locked= !state.locked, candies= state.candies-1, coins= state.coins) else state})
             }yield a;
         }
     }
